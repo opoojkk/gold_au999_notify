@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def fetch_gold_9999_data():
     """爬取上海黄金交易所黄金9999的实时行情数据"""
@@ -46,7 +46,6 @@ def fetch_gold_9999_data():
         
         print("未能解析到数据")
         return None
-            
     except Exception as e:
         print(f"请求失败: {e}")
         import traceback
@@ -59,7 +58,7 @@ def parse_gold_data(raw_data):
     try:
         print("\n开始解析数据...")
         print(f"原始数据示例: q63={raw_data.get('q63')}, q80={raw_data.get('q80')}")
-        
+
         def format_value(val, precision=2):
             try:
                 if val is None or val == '':
@@ -69,15 +68,18 @@ def parse_gold_data(raw_data):
             except:
                 return None
         
-        # 时间转换
+        # 时间转换为北京时间
         update_time = None
         if raw_data.get('time'):
             try:
-                timestamp = int(raw_data.get('time')) / 1000
-                update_time = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-            except:
+                timestamp = int(raw_data.get('time')) / 1000  # 转为秒
+                update_time_utc = datetime.utcfromtimestamp(timestamp)  # 获取 UTC 时间
+                update_time_beijing = update_time_utc + timedelta(hours=8)  # 转为北京时间
+                update_time = update_time_beijing.strftime('%Y-%m-%d %H:%M:%S')  # 格式化时间
+            except Exception as e:
+                print(f"时间转换失败: {e}")
                 update_time = str(raw_data.get('time'))
-        
+
         parsed_data = {
             '商品名称': raw_data.get('showName', '黄金9999'),
             '商品代码': raw_data.get('code', 'JO_71'),
@@ -93,7 +95,7 @@ def parse_gold_data(raw_data):
             '单位': raw_data.get('unit', '元/克'),
             '更新时间': update_time
         }
-        
+
         print(f"解析完成，最新价: {parsed_data['最新价']}")
         return parsed_data
         
@@ -146,15 +148,7 @@ def format_telegram_message(data):
     
     # 获取更新时间并转换为北京时间
     if data.get('更新时间'):
-        # 时间字符串转换为 datetime 对象
-        try:
-            update_time_utc = datetime.strptime(data['更新时间'], '%Y-%m-%d %H:%M:%S')
-            update_time_beijing = update_time_utc + timedelta(hours=8)  # 转换为北京时间
-            update_time_str = update_time_beijing.strftime('%Y-%m-%d %H:%M:%S')
-            message += f"\n🕒 更新时间: {update_time_str} (北京时间)"
-        except Exception as e:
-            print(f"时间转换失败: {e}")
-            message += f"\n🕒 更新时间: {data['更新时间']}"
+        message += f"\n🕒 更新时间: {data['更新时间']} (北京时间)"
     
     return message
 
@@ -197,7 +191,7 @@ if __name__ == "__main__":
     
     if gold_data:
         print("\n" + "="*50)
-        print("数据获取成功，准备发送到 Telegram...")
+        print("数据获取成功，准备发送到 Telegram...")        
         print("="*50 + "\n")
         
         # 格式化消息
