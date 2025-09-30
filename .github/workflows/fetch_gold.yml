@@ -2,7 +2,7 @@ name: Fetch Gold Price
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # 每 30 分钟执行一次
+    - cron: "*/30 1-14 * * *"  # 每 30 分钟执行一次，时间段是 9:00 AM 至 10:00 PM（北京时间）
   workflow_dispatch:  # 手动触发
 
 jobs:
