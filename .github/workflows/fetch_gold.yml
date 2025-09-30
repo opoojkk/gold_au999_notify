@@ -26,7 +26,7 @@ jobs:
         run: |
           python fetch_gold.py > result.txt
           echo "message<<EOF" >> $GITHUB_ENV
-          cat result.txt >> $GITHUB_ENV
+          cat result.txt | while read line; do echo "$line" >> $GITHUB_ENV; done
           echo "EOF" >> $GITHUB_ENV
 
       - name: Notify Telegram
