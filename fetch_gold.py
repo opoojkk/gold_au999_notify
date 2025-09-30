@@ -144,8 +144,17 @@ def format_telegram_message(data):
     if data.get('昨收价'):
         message += f"昨收价: {data['昨收价']:.2f}\n"
     
+    # 获取更新时间并转换为北京时间
     if data.get('更新时间'):
-        message += f"\n🕒 更新时间: {data['更新时间']}"
+        # 时间字符串转换为 datetime 对象
+        try:
+            update_time_utc = datetime.strptime(data['更新时间'], '%Y-%m-%d %H:%M:%S')
+            update_time_beijing = update_time_utc + timedelta(hours=8)  # 转换为北京时间
+            update_time_str = update_time_beijing.strftime('%Y-%m-%d %H:%M:%S')
+            message += f"\n🕒 更新时间: {update_time_str} (北京时间)"
+        except Exception as e:
+            print(f"时间转换失败: {e}")
+            message += f"\n🕒 更新时间: {data['更新时间']}"
     
     return message
 
