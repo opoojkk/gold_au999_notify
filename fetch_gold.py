@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 from datetime import datetime
 
 def fetch_gold_9999_data():
@@ -103,40 +104,100 @@ def parse_gold_data(raw_data):
         return None
 
 
-def display_gold_data(data):
-    """格式化显示数据，返回字符串格式（去掉=符号）"""
+def format_telegram_message(data):
+    """格式化为 Telegram 消息"""
     if not data:
-        return "无数据可显示"
+        return "❌ 获取黄金价格失败"
     
-    result = "上海黄金交易所 - 黄金9999 实时行情\n"
-    result += "\n"
+    # 判断涨跌
+    change_pct = data.get('涨跌幅(%)')
+    if change_pct and change_pct > 0:
+        trend = "📈"
+    elif change_pct and change_pct < 0:
+        trend = "📉"
+    else:
+        trend = "➖"
     
-    for key, value in data.items():
-        if value is not None:
-            if isinstance(value, float):
-                result += f"{key:15s}: {value:.2f}\n"
-            else:
-                result += f"{key:15s}: {value}\n"
+    message = f"{trend} 上海黄金交易所 - 黄金9999\n\n"
+    
+    # 关键数据
+    latest_price = data.get('最新价')
+    change_amount = data.get('涨跌额')
+    change_pct = data.get('涨跌幅(%)')
+    
+    if latest_price:
+        message += f"💰 最新价: {latest_price:.2f} {data.get('单位', '元/克')}\n"
+    
+    if change_amount is not None and change_pct is not None:
+        sign = "+" if change_amount >= 0 else ""
+        message += f"📊 涨跌: {sign}{change_amount:.2f} ({sign}{change_pct:.2f}%)\n"
+    
+    message += "\n"
+    
+    # 详细数据
+    if data.get('开盘价'):
+        message += f"开盘价: {data['开盘价']:.2f}\n"
+    if data.get('最高价'):
+        message += f"最高价: {data['最高价']:.2f}\n"
+    if data.get('最低价'):
+        message += f"最低价: {data['最低价']:.2f}\n"
+    if data.get('昨收价'):
+        message += f"昨收价: {data['昨收价']:.2f}\n"
+    
+    if data.get('更新时间'):
+        message += f"\n🕒 更新时间: {data['更新时间']}"
+    
+    return message
+
+
+def send_telegram_message(message):
+    """发送消息到 Telegram"""
+    bot_token = os.getenv('TG_BOT_TOKEN')
+    chat_id = os.getenv('TG_CHAT_ID')
+    
+    if not bot_token or not chat_id:
+        print("错误: 缺少 TG_BOT_TOKEN 或 TG_CHAT_ID 环境变量")
+        return False
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    
+    payload = {
+        'chat_id': chat_id,
+        'text': message,
+        'parse_mode': 'HTML'  # 可选: 支持 HTML 格式
+    }
+    
+    try:
+        response = requests.post(url, data=payload, timeout=10)
+        if response.status_code == 200:
+            print("✅ Telegram 消息发送成功")
+            return True
         else:
-            result += f"{key:15s}: ----\n"
-    
-    return result
+            print(f"❌ Telegram 发送失败: {response.status_code}")
+            print(f"响应: {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Telegram 发送异常: {e}")
+        return False
 
 
 if __name__ == "__main__":
-    print("确保已安装依赖: pip install requests beautifulsoup4\n")
     print("正在获取黄金9999实时数据...\n")
     
     gold_data = fetch_gold_9999_data()
     
     if gold_data:
-        result = display_gold_data(gold_data)
+        print("\n" + "="*50)
+        print("数据获取成功，准备发送到 Telegram...")
+        print("="*50 + "\n")
         
-        # 将格式化后的结果保存到 result.txt
-        output_file = 'result.txt'
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(result)
+        # 格式化消息
+        telegram_msg = format_telegram_message(gold_data)
         
-        print(f"数据已保存到 {output_file}")
+        # 发送到 Telegram
+        send_telegram_message(telegram_msg)
+        
     else:
-        print("获取数据失败")
+        print("\n❌ 获取数据失败")
+        # 发送失败通知
+        send_telegram_message("❌ 黄金价格获取失败，请检查日志")
